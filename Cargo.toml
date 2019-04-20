@@ -1,0 +1,8 @@
+[package]
+name = "mini-irc"
+version = "0.1.0"
+authors = ["unbalancedparentheses <mail@fcarrone.com>"]
+edition = "2018"
+
+[dependencies]
+termion = "*"
