@@ -27,7 +27,7 @@ pub enum IRCMessage {
     User(String, String),
     Ping(String),
     Pong(String),
-    Join(String, String),
+    Join(String),
     Part(String, String, String),
     Notice(String, String, String),
     PrivMsg(String, String, String),
@@ -40,37 +40,37 @@ impl IRCMessage {
     pub fn to_string(self) -> Result<String, String> {
         match self {
             IRCMessage::Pass(password) => {
-                Ok(format!("PASS {}\r\n", password))
+                Ok(format!("PASS {}", password))
             },
             IRCMessage::Nick(name) => {
-                Ok(format!("NICK {}\r\n", name))
+                Ok(format!("NICK {}", name))
             },
             IRCMessage::User(name, realname) => {
-                Ok(format!("USER {} 0 * :{}\r\n", name, realname))
+                Ok(format!("USER {} 0 * :{}", name, realname))
             },
             IRCMessage::Ping(data) => {
-                Ok(format!("PING {}\r\n", data))
+                Ok(format!("PING {}", data))
             },
             IRCMessage::Pong(data) => {
-                Ok(format!("PONG {}\r\n", data))
+                Ok(format!("PONG {}", data))
             },
-            IRCMessage::Join(_, channel) => {
-                Ok(format!("JOIN {}\r\n", channel))
+            IRCMessage::Join(channel) => {
+                Ok(format!("JOIN {}", channel))
             },
             IRCMessage::Notice(_, target, message) => {
-                Ok(format!("NOTICE {} {}\r\n", target, message))
+                Ok(format!("NOTICE {} {}", target, message))
             },
             IRCMessage::PrivMsg(_, target, message) => {
-                Ok(format!("PRIVMSG {} {}\r\n", target, message))
+                Ok(format!("PRIVMSG {} {}", target, message))
             },
             IRCMessage::Part(_, channel, _) => {
-                Ok(format!("PART {}\r\n", channel))
+                Ok(format!("PART {}", channel))
             }
             IRCMessage::Quit() => {
-                Ok("QUIT\r\n".to_string())
+                Ok("QUIT".to_string())
             },
             IRCMessage::Unknown(data) => {
-                Err(format!("{}\r\n", data))
+                Err(format!("{}", data))
             },
             IRCMessage::Nothing => {
                 Err("".to_string())
@@ -116,7 +116,7 @@ impl IRCMessage {
             },
             "JOIN" => {
                 let chan = words.next().unwrap().to_string();
-                IRCMessage::Join(source, chan)
+                IRCMessage::Join(chan)
             },
             "PART" => {
                 let chan = words.next().unwrap().to_string();
@@ -151,8 +151,8 @@ fn main() {
                 Ok(msg) => {
                     swriter.write(format!("{}\r\n", msg).as_bytes());
                 },
-                Err(err) => {
-
+                Err(e) => {
+                    println!("Failed to send data: {}", e);
                 }    
             }
         }
@@ -212,6 +212,14 @@ fn main() {
                             senderw_stdin_thread.send(IRCMessage::Quit());
                             process::exit(0);
                         },
+                        //TODO REMOVE testing keys
+                        Key::Ctrl('o') => {
+                            senderw_stdin_thread.send(IRCMessage::Join("#prueba".to_string()));
+                        },
+                        //TODO REMOVE testing keys
+                        Key::Ctrl('m') => {
+                            senderw_stdin_thread.send(IRCMessage::PrivMsg("".to_string(), "#prueba".to_string(), "hola mundo".to_string()));
+                        },
                         _ => {
                             
                         }
@@ -224,6 +232,7 @@ fn main() {
     sender_write.send(IRCMessage::Pass("none".to_string()));
     sender_write.send(IRCMessage::Nick("unbalancedpare".to_string()));
     sender_write.send(IRCMessage::User("unbalancedparentheses".to_string(), "Federico Carrone".to_string()));
+    
 
     loop {        
         match receive_read.recv() {
@@ -231,7 +240,7 @@ fn main() {
                 match msg.to_string() {
                     Ok(s) => {
                         let now: DateTime<Local> = Local::now();
-                        write!(stdout_main.lock().unwrap(), "{}:{} {}\r\n", now.hour(), now.minute(), s);
+                        write!(stdout_main.lock().unwrap(), "{:02}:{:02} {}\r\n", now.hour(), now.minute(), s);
                         stdout_main.lock().unwrap().flush().unwrap();
                     },
                     Err(e) => {

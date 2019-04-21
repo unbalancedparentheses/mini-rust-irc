@@ -1,13 +1,13 @@
 * TODO 
 
-- Refactor channels to ircmessages
-- format time to use 2 chars/padding
-- wait until message of quit is sent instead of killing everything
-- implement fmd display for irc message
-- manage registration timeout when the nick is already in use or other uses cases
+- check while two enters are being printed when receiving messages
 - implement prompt
 - implement status bar
 - implemente multiple windows
+- wait until message of quit is sent instead of killing everything
+- remove testing keys that join channels and send messages
+- implement fmd display for irc message
+- manage registration timeout when the nick is already in use or other uses cases
 - check if the match cmd can be implemented in a better way instead of using vec<&str>
 - manage reconnection
 - support  MODE
