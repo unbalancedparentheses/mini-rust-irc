@@ -1,14 +1,17 @@
-- Support ping
+* TODO 
+
 - Refactor channels to ircmessages
 - add TIME 
 - implement prompt
 - implement status bar
 - implemente multiple windows
-- implement multiple 
+- check if the match cmd can be implemented in a better way instead of using vec<&str>
 - manage reconnection
-- support PASS, NICK, USER, PING, PONG, JOIN, PRIVMSG, MODE
+- support  MODE
 
 * Links to read
+
+https://aml3.github.io/RustTutorial/
 
 https://channel9.msdn.com/Blogs/Seth-Juarez/Anders-Hejlsberg-on-Modern-Compiler-Construction
 
