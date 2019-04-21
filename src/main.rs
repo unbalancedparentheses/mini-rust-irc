@@ -2,11 +2,11 @@ extern crate termion;
 extern crate chrono;
 
 use termion::raw::IntoRawMode;
-use termion::event::Key;
 use termion::input::TermRead;
 use termion::screen::*;
+use termion::{color, style, cursor};
 
-use std::io::{Write, stdout, stdin};
+use std::io::{Write, stdout};
 use std::io::prelude::*;
 use std::net::TcpStream;
 
@@ -15,10 +15,14 @@ use std::sync::{Arc, Mutex};
 use std::sync::mpsc::channel;
 use std::sync::mpsc::{Sender, Receiver};
 
-
 use std::process;
 
 use chrono::prelude::*;
+
+extern crate rustyline;
+
+use rustyline::error::ReadlineError;
+use rustyline::Editor;
 
 #[derive(Debug)]
 pub enum IRCMessage {
@@ -57,13 +61,13 @@ impl IRCMessage {
             IRCMessage::Join(channel) => {
                 Ok(format!("JOIN {}", channel))
             },
-            IRCMessage::Notice(_, target, message) => {
+            IRCMessage::Notice(_, target, message) => { //TODO check if we can have an arity 2 notice
                 Ok(format!("NOTICE {} {}", target, message))
             },
-            IRCMessage::PrivMsg(_, target, message) => {
+            IRCMessage::PrivMsg(_, target, message) => { //TODO check if we can have an arity 2 privmsg
                 Ok(format!("PRIVMSG {} {}", target, message))
             },
-            IRCMessage::Part(_, channel, _) => {
+            IRCMessage::Part(_, channel, _) => { //TODO check if we can have an arity 1 part
                 Ok(format!("PART {}", channel))
             }
             IRCMessage::Quit() => {
@@ -194,57 +198,72 @@ fn main() {
     let mut screen = AlternateScreen::from(stdout().into_raw_mode().unwrap());
     
     let stdout_main = Arc::new(Mutex::new(screen));;
-    let stdout_thread = stdout_main.clone();
 
+    let mut rl = Editor::<()>::new();
+    
     let _stdin_thread = spawn(move|| { 
         loop {
-            for key in stdin().keys() {
-                if key.is_ok() {
-                    match key.unwrap() {
-                        Key::Char('\n') => {
-                            write!(stdout_thread.lock().unwrap(), "\r\n");
+            let readline = rl.readline("");
+            match readline {
+                Ok(line) => {
+                    match parse_commandline(line) {
+                        Ok(message) => {
+                            senderw_stdin_thread.send(message);
                         },
-                        Key::Char(c) => {
-                            write!(stdout_thread.lock().unwrap(), "{}", c);
-                            stdout_thread.lock().unwrap().flush().unwrap();
-                        },
-                        Key::Ctrl('c') => {
-                            senderw_stdin_thread.send(IRCMessage::Quit());
-                            process::exit(0);
-                        },
-                        //TODO REMOVE testing keys
-                        Key::Ctrl('o') => {
-                            senderw_stdin_thread.send(IRCMessage::Join("#prueba".to_string()));
-                        },
-                        //TODO REMOVE testing keys
-                        Key::Ctrl('n') => {
-                            senderw_stdin_thread.send(IRCMessage::PrivMsg("".to_string(), "#prueba".to_string(), "hola mundo".to_string()));
-                        },
-                        _ => {
-                            
+                        Err(e) => {
+                            println!("Unknown command: {}", e);
                         }
-                    }                    
+                    }
+                },
+                Err(ReadlineError::Interrupted) => {
+                    senderw_stdin_thread.send(IRCMessage::Quit());
+                    process::exit(0);                },
+                Err(ReadlineError::Eof) => {
+                    senderw_stdin_thread.send(IRCMessage::Quit());
+                    process::exit(0);
+                },
+                Err(err) => {
+                    println!("Error: {:?}", err);
                 }
             }
         }
     });
     
     sender_write.send(IRCMessage::Pass("none".to_string()));
-    sender_write.send(IRCMessage::Nick("unbalancedpare".to_string()));
+    sender_write.send(IRCMessage::Nick("unbalancedpared".to_string()));
     sender_write.send(IRCMessage::User("unbalancedparentheses".to_string(), "Federico Carrone".to_string()));
-    
 
-    loop {        
+    loop {
+        let (x, y) = termion::terminal_size().unwrap();
+        let mut border = String::new();
+
+        for i in 1..x {
+            border.push(' ')
+        }
+        
         match receive_read.recv() {
             Ok(msg) =>
                 match msg.to_string() {
-                    Ok(s) => {
+                    Ok(s) => {  
                         let now: DateTime<Local> = Local::now();
                         write!(stdout_main.lock().unwrap(), "{:02}:{:02} {}\r\n", now.hour(), now.minute(), s);
+
+                        write!(stdout_main.lock().unwrap(), "{}", cursor::Goto(1, 1)).unwrap();
+                        write!(stdout_main.lock().unwrap(), "{}", color::Bg(color::Blue)).unwrap();
+                        write!(stdout_main.lock().unwrap(), "{}", border).unwrap();
+                        write!(stdout_main.lock().unwrap(), "{}", style::Reset);
+                        write!(stdout_main.lock().unwrap(), "{}", cursor::Goto(1, y)).unwrap();
                         stdout_main.lock().unwrap().flush().unwrap();
                     },
                     Err(e) => {
-                        write!(stdout_main.lock().unwrap(), "{}", e);
+                        write!(stdout_main.lock().unwrap(), "error: {}", e);
+
+                        write!(stdout_main.lock().unwrap(), "{}", cursor::Goto(1, 1)).unwrap();
+                        write!(stdout_main.lock().unwrap(), "{}", color::Bg(color::Blue)).unwrap();
+                        write!(stdout_main.lock().unwrap(), "{}", border).unwrap();
+                        write!(stdout_main.lock().unwrap(), "{}", style::Reset);
+                        write!(stdout_main.lock().unwrap(), "{}", cursor::Goto(1, y)).unwrap();
+                        stdout_main.lock().unwrap().flush().unwrap();
                     }
                 },
             Err(RecvError) => {
@@ -257,4 +276,26 @@ fn main() {
     //sender_thread.join();
     //receive_thread.join();
     //stdin_thread.join();
+}
+
+fn parse_commandline(s: String) -> Result<IRCMessage, String> {
+    if s.starts_with('/') {
+        let mut iter = s.split_whitespace();
+        match iter.next() {
+            Some("/join") => {
+                match iter.next() {
+                    Some(channel) => Ok(IRCMessage::Join(channel.to_string())),
+                    None => Err("Not enough parameters given".to_string())
+                }
+            },
+            Some(_) => {
+                Err("Command not supported".to_string())
+            }
+            None => {
+                Err("Not enough parameters given".to_string())
+            }
+        }
+    } else {
+        Ok(IRCMessage::PrivMsg("".to_string(), "#prueba".to_string(), s.to_string()))
+    }
 }

@@ -5,5 +5,6 @@ authors = ["unbalancedparentheses <mail@fcarrone.com>"]
 edition = "2018"
 
 [dependencies]
-termion = "*"
+termion = "1.5.1"
 chrono = "0.4"
+rustyline = "3.0.0"
