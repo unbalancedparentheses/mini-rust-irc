@@ -1,33 +1,23 @@
-- sacar enters
-- hacer que haya word wrap
-- que no imprima abajo en el input
-- que no imprima arriba en la status
-- status (number of windows)
-- line editing abajo
-- lectura y escritura del socket concurrente
-
-- add TIME
-- setlocale(LC_ALL, "");
-- signal(SIGWINCH, sigwinch);
-        
-        // TODO send MODE  sndf("MODE %s +i", nick);
-        // TODO user  sndf("USER %s 8 * :%s", user, user);
-
-
+- Support ping
+- Refactor channels to ircmessages
+- add TIME 
+- implement prompt
+- implement status bar
+- implemente multiple windows
+- implement multiple 
 - manage reconnection
-- emacs like keybinding
-- terminal resize
+- support PASS, NICK, USER, PING, PONG, JOIN, PRIVMSG, MODE
 
-nc irc.freenode.net 6667
+* Links to read
 
-PASS none
-NICK sorandom29      
-USER blah blah blah blah
+https://channel9.msdn.com/Blogs/Seth-Juarez/Anders-Hejlsberg-on-Modern-Compiler-Construction
 
-PING :lindbohm.freenode.net
-PONG :lindbohm.freenode.net
+https://manishearth.github.io/blog/2015/05/27/wrapper-types-in-rust-choosing-your-guarantees/
 
-JOIN #linux
+https://github.com/Nervengift/chat-server-example/blob/master/src/main.rs
 
-PRIVMSG #linux :hello guys! i'm using telnet to connect to irc and that's such a stupid idea, i have to respond to PINGs manually!
+https://nbaksalyar.github.io/2015/07/10/writing-chat-in-rust.html
 
+https://jsdw.me/posts/rust-asyncawait-preview/
+
+https://stackoverflow.com/questions/33116317/when-would-you-use-a-mutex-without-an-arc

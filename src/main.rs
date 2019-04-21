@@ -9,6 +9,7 @@ use std::io::prelude::*;
 use std::net::TcpStream;
 
 use std::thread::spawn;
+use std::sync::{Arc, Mutex};
 use std::sync::mpsc::channel;
 use std::sync::mpsc::{Sender, Receiver};
 
@@ -53,10 +54,8 @@ impl IRCMessage {
     }
 
     pub fn from_string(s: &str) -> Self {
-        println!("{}", s);
+        // println!("{}", s);
         let mut words = s.split_whitespace();
-
-        //println!("{:?}", words);
         return IRCMessage::Nothing;
     }
 }
@@ -76,7 +75,6 @@ fn main() {
             swriter.write(message.as_bytes());
         }
     });
-
     
     let receive_thread = spawn(move || {        
         'read: loop {
@@ -92,8 +90,14 @@ fn main() {
                     let lines = String::from_utf8_lossy(&slice);
                     let broken_lines = lines.split("\n");
                     for message in broken_lines {
-                        IRCMessage::from_string(message);
-                        receive_write.send(message.to_string()).unwrap();
+                        match IRCMessage::from_string(message) {
+                            IRCMessage::Ping(data) => {
+                                sender_write.send(IRCMessage::Pong().to_string());
+                            },
+                            _ => {   
+                                receive_write.send(message.to_string()).unwrap();
+                            }
+                        }
                     }
                 },
                 Err(e) => {
@@ -103,12 +107,29 @@ fn main() {
         }
     });
 
-    let stdin_thread = spawn(move|| {
+        
+    let stdout_main = Arc::new(Mutex::new(stdout().into_raw_mode().unwrap()));;
+    let stdout_thread = stdout_main.clone();
+
+    let stdin_thread = spawn(move|| { 
         loop {
             for key in stdin().keys() {
                 if key.is_ok() {
-                    println!("{:?}", key.unwrap());
-                    keys_write.send(key.unwrap().clone());
+                    match key.unwrap() {
+                        Key::Char('\n') => {
+                            write!(stdout_thread.lock().unwrap(), "\r\n");
+                        },
+                        Key::Char(c) => {
+                            write!(stdout_thread.lock().unwrap(), "{}", c);
+                            stdout_thread.lock().unwrap().flush().unwrap();
+                        },
+                        Key::Ctrl('c') => {
+                            process::exit(0);
+                        },
+                        _ => {
+                            
+                        }
+                    }                    
                 }
             }
         }
@@ -119,24 +140,10 @@ fn main() {
     sender_write.send(String::from("USER ertwiop blah blah blah\n"));
     sender_write.send(String::from("JOIN #archlinux\n"));
 
-    let mut stdout = stdout().into_raw_mode().unwrap();
-
-    loop {
-        let key = keys_read.try_recv();
-        if key.is_ok() {
-            let key = key.unwrap();
-            match key {  
-                Key::Char('q') => {
-                    process::exit(0);
-                },
-                _ => {}
-            }
-        }
-
-        
+    loop {        
         let msg = receive_read.recv().unwrap();
-        //write!(stdout, "msg: {:?}\r\n", msg);
-        stdout.flush().unwrap();
+            write!(stdout_main.lock().unwrap(), "{}\r\n", msg);        
+        stdout_main.lock().unwrap().flush().unwrap();
     }
     
     sender_thread.join();
