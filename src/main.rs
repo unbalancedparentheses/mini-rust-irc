@@ -1,10 +1,6 @@
-extern crate termion;
 extern crate chrono;
 
-use termion::raw::IntoRawMode;
-use termion::input::TermRead;
-use termion::screen::*;
-use termion::{color, style, cursor};
+use std::io;
 
 use std::io::{Write, stdout};
 use std::io::prelude::*;
@@ -18,10 +14,38 @@ use std::process;
 
 use chrono::prelude::*;
 
-extern crate rustyline;
+extern crate tui;
+extern crate termion;
+use termion::cursor::Goto;
+use termion::event::Key;
+use termion::input::MouseTerminal;
+use termion::raw::IntoRawMode;
+use termion::screen::AlternateScreen;
+use tui::backend::TermionBackend;
+use tui::layout::{Constraint, Direction, Layout};
+use tui::style::{Color, Style};
+use tui::widgets::{Block, Borders, List, Paragraph, Text, Widget};
+use tui::Terminal;
 
+extern crate rustyline;
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
+
+struct App {
+    input: String,
+    /// History of recorded messages
+    messages: Vec<String>,
+}
+
+impl Default for App {
+    fn default() -> App {
+        App {
+            input: String::new(),
+            messages: Vec::new(),
+        }
+    }
+}
+
 
 #[derive(Debug)]
 pub enum IRCMessage {
@@ -201,6 +225,7 @@ fn main() {
     let _stdin_thread = spawn(move|| { 
         loop {
             let readline = rl.readline("");
+
             match readline {
                 Ok(line) => {
                     match parse_commandline(line) {
@@ -220,7 +245,7 @@ fn main() {
                     process::exit(0);
                 },
                 Err(err) => {
-                    println!("Error: {:?}", err);
+                    println!("readline error: {:?}", err);
                 }
             }
         }
@@ -230,43 +255,71 @@ fn main() {
     sender_write.send(IRCMessage::Nick("unbalancedpared".to_string()));
     sender_write.send(IRCMessage::User("unbalancedparentheses".to_string(), "Federico Carrone".to_string()));
 
-    loop {
-        let (x, y) = termion::terminal_size().unwrap();
-        let mut border = String::new();
+    // Terminal initialization
+    let stdout = io::stdout().into_raw_mode().unwrap();
+    let stdout = MouseTerminal::from(stdout);
+    let stdout = AlternateScreen::from(stdout);
+    let backend = TermionBackend::new(stdout);
+    let mut terminal = Terminal::new(backend).unwrap();
 
-        for i in 1..x {
-            border.push(' ')
-        }
+    // Create default app state
+    let mut app = App::default();
+    
+    loop {
+        let (max_x, max_y) = termion::terminal_size().unwrap();
+
+        terminal.draw(|mut f| {
+            let chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Min(1), Constraint::Length(3)].as_ref())
+                .split(f.size());
+
+            let mut messages = app
+                .messages
+                .iter()
+                .rev()
+                .take(max_y as usize - 5)
+                .map(|m| Text::raw(format!("{}\n", m)))
+                .collect::<Vec<_>>();
+
+            messages.reverse();
+
+            Paragraph::new(messages.iter())
+                .block(Block::default().borders(Borders::ALL).title("Messages"))
+                .wrap(true)
+                .render(&mut f, chunks[0]);
+
+            Paragraph::new([Text::raw(&app.input)].iter())
+                .style(Style::default().fg(Color::Green))
+                .block(Block::default().borders(Borders::ALL).title("Input"))
+                .render(&mut f, chunks[1]);
+        });
+
+        // Put the cursor back inside the input box
+        write!(
+            terminal.backend_mut(),
+            "{}",
+            Goto(2, max_y - 1)
+        );
         
         match receive_read.recv() {
             Ok(msg) =>
                 match msg.to_string() {
                     Ok(s) => {  
                         let now: DateTime<Local> = Local::now();
-                        write!(screen, "{:02}:{:02} {}\r\n", now.hour(), now.minute(), s);
-
-                        write!(screen, "{}", cursor::Goto(1, 1)).unwrap();
-                        write!(screen, "{}", color::Bg(color::Blue)).unwrap();
-                        write!(screen, "{}", border).unwrap();
-                        write!(screen, "{}", style::Reset);
-                        write!(screen, "{}", cursor::Goto(1, y)).unwrap();
-                        screen.flush();
+                        app.messages.push(s);
+                        //write!(screen, "{:02}:{:02} {}\r\n", now.hour(), now.minute(), s);
+                        
                     },
                     Err(e) => {
-                        write!(screen, "error: {}", e);
-
-                        write!(screen, "{}", cursor::Goto(1, 1)).unwrap();
-                        write!(screen, "{}", color::Bg(color::Blue)).unwrap();
-                        write!(screen, "{}", border).unwrap();
-                        write!(screen, "{}", style::Reset);
-                        write!(screen, "{}", cursor::Goto(1, y)).unwrap();
-                        screen.flush();
+                        let s = format!("error: {}", e);
+                        app.messages.push(s);
                     }
                 },
             Err(RecvError) => {
                 process::exit(1); //TODO this means that the socket was disconnected or the thread died
             }
-        }
+        }     
     }
 
     //TODO check that threads joined
