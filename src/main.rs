@@ -11,7 +11,6 @@ use std::io::prelude::*;
 use std::net::TcpStream;
 
 use std::thread::spawn;
-use std::sync::{Arc, Mutex};
 use std::sync::mpsc::channel;
 use std::sync::mpsc::{Sender, Receiver};
 
@@ -195,9 +194,7 @@ fn main() {
         }
     });
 
-    let mut screen = AlternateScreen::from(stdout().into_raw_mode().unwrap());
-    
-    let stdout_main = Arc::new(Mutex::new(screen));;
+    let mut screen = AlternateScreen::from(stdout().into_raw_mode().unwrap());    
 
     let mut rl = Editor::<()>::new();
     
@@ -246,24 +243,24 @@ fn main() {
                 match msg.to_string() {
                     Ok(s) => {  
                         let now: DateTime<Local> = Local::now();
-                        write!(stdout_main.lock().unwrap(), "{:02}:{:02} {}\r\n", now.hour(), now.minute(), s);
+                        write!(screen, "{:02}:{:02} {}\r\n", now.hour(), now.minute(), s);
 
-                        write!(stdout_main.lock().unwrap(), "{}", cursor::Goto(1, 1)).unwrap();
-                        write!(stdout_main.lock().unwrap(), "{}", color::Bg(color::Blue)).unwrap();
-                        write!(stdout_main.lock().unwrap(), "{}", border).unwrap();
-                        write!(stdout_main.lock().unwrap(), "{}", style::Reset);
-                        write!(stdout_main.lock().unwrap(), "{}", cursor::Goto(1, y)).unwrap();
-                        stdout_main.lock().unwrap().flush().unwrap();
+                        write!(screen, "{}", cursor::Goto(1, 1)).unwrap();
+                        write!(screen, "{}", color::Bg(color::Blue)).unwrap();
+                        write!(screen, "{}", border).unwrap();
+                        write!(screen, "{}", style::Reset);
+                        write!(screen, "{}", cursor::Goto(1, y)).unwrap();
+                        screen.flush();
                     },
                     Err(e) => {
-                        write!(stdout_main.lock().unwrap(), "error: {}", e);
+                        write!(screen, "error: {}", e);
 
-                        write!(stdout_main.lock().unwrap(), "{}", cursor::Goto(1, 1)).unwrap();
-                        write!(stdout_main.lock().unwrap(), "{}", color::Bg(color::Blue)).unwrap();
-                        write!(stdout_main.lock().unwrap(), "{}", border).unwrap();
-                        write!(stdout_main.lock().unwrap(), "{}", style::Reset);
-                        write!(stdout_main.lock().unwrap(), "{}", cursor::Goto(1, y)).unwrap();
-                        stdout_main.lock().unwrap().flush().unwrap();
+                        write!(screen, "{}", cursor::Goto(1, 1)).unwrap();
+                        write!(screen, "{}", color::Bg(color::Blue)).unwrap();
+                        write!(screen, "{}", border).unwrap();
+                        write!(screen, "{}", style::Reset);
+                        write!(screen, "{}", cursor::Goto(1, y)).unwrap();
+                        screen.flush();
                     }
                 },
             Err(RecvError) => {
