@@ -127,7 +127,7 @@ impl IRCMessage {
             _ => {
                 let data: Vec<&str> = words.collect();
                 let data = data.join(" ").to_string();
-                IRCMessage::Unknown(format!("{} {} {}", source, cmd, data))
+                IRCMessage::Unknown(format!("{} {} {}\r\n", source, cmd, data))
             }
         }
     }
@@ -217,7 +217,7 @@ fn main() {
                             senderw_stdin_thread.send(IRCMessage::Join("#prueba".to_string()));
                         },
                         //TODO REMOVE testing keys
-                        Key::Ctrl('m') => {
+                        Key::Ctrl('n') => {
                             senderw_stdin_thread.send(IRCMessage::PrivMsg("".to_string(), "#prueba".to_string(), "hola mundo".to_string()));
                         },
                         _ => {

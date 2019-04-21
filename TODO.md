@@ -1,6 +1,5 @@
 * TODO 
 
-- check while two enters are being printed when receiving messages
 - implement prompt
 - implement status bar
 - implemente multiple windows
@@ -11,6 +10,7 @@
 - check if the match cmd can be implemented in a better way instead of using vec<&str>
 - manage reconnection
 - support  MODE
+- add ssl
 
 * Links to read
 
