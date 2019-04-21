@@ -1,8 +1,9 @@
 * TODO 
 
+- remove rustyline and use tuirs
 - resolve bugs related to implementing a status bar and a prompt (bar on top is being printed really slow)
 - if enter is pressed while in a channel, nothing should be sent
-- set a global state (with mutex since it is going to be touched by many threads) with the channel we are connected to
+- set a global state (with mutex since it is going to be touched by many threads) with the channel we are connected to. implement a better app state 
 - implement prompt (irc should not write at the last line of the shell)
 - implement status bar using multiple windows
 - add option parsing that overwrites the for connecting to server with a particular user and to a list of channels

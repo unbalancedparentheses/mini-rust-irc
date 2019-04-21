@@ -217,9 +217,7 @@ fn main() {
             }
         }
     });
-
-    let mut screen = AlternateScreen::from(stdout().into_raw_mode().unwrap());    
-
+    
     let mut rl = Editor::<()>::new();
     
     let _stdin_thread = spawn(move|| { 
@@ -257,7 +255,6 @@ fn main() {
 
     // Terminal initialization
     let stdout = io::stdout().into_raw_mode().unwrap();
-    let stdout = MouseTerminal::from(stdout);
     let stdout = AlternateScreen::from(stdout);
     let backend = TermionBackend::new(stdout);
     let mut terminal = Terminal::new(backend).unwrap();
@@ -271,35 +268,36 @@ fn main() {
         terminal.draw(|mut f| {
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
-                .constraints([Constraint::Min(1), Constraint::Length(3)].as_ref())
+                .constraints([Constraint::Min(1), Constraint::Length(2)].as_ref())
                 .split(f.size());
 
             let mut messages = app
                 .messages
                 .iter()
                 .rev()
-                .take(max_y as usize - 5)
+                .take(max_y as usize - 2)
                 .map(|m| Text::raw(format!("{}\n", m)))
                 .collect::<Vec<_>>();
 
             messages.reverse();
 
             Paragraph::new(messages.iter())
-                .block(Block::default().borders(Borders::ALL).title("Messages"))
+                .block(Block::default())
                 .wrap(true)
                 .render(&mut f, chunks[0]);
 
             Paragraph::new([Text::raw(&app.input)].iter())
                 .style(Style::default().fg(Color::Green))
-                .block(Block::default().borders(Borders::ALL).title("Input"))
+                .block(Block::default())
                 .render(&mut f, chunks[1]);
         });
 
         // Put the cursor back inside the input box
+
         write!(
             terminal.backend_mut(),
             "{}",
-            Goto(2, max_y - 1)
+            Goto(0, max_y - 1)
         );
         
         match receive_read.recv() {
@@ -307,13 +305,13 @@ fn main() {
                 match msg.to_string() {
                     Ok(s) => {  
                         let now: DateTime<Local> = Local::now();
-                        app.messages.push(s);
-                        //write!(screen, "{:02}:{:02} {}\r\n", now.hour(), now.minute(), s);
-                        
+                        let s_with_time = format!("{:02}:{:02} {}\r\n", now.hour(), now.minute(), s);
+                        app.messages.push(s_with_time);
                     },
                     Err(e) => {
-                        let s = format!("error: {}", e);
-                        app.messages.push(s);
+                        let now: DateTime<Local> = Local::now();
+                        let s_with_time = format!("{:02}:{:02} Error: {}\r\n", now.hour(), now.minute(), e);
+                        app.messages.push(s_with_time);
                     }
                 },
             Err(RecvError) => {
