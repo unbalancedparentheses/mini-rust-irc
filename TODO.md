@@ -1,7 +1,10 @@
 * TODO 
 
-- add TIME 
 - Refactor channels to ircmessages
+- format time to use 2 chars/padding
+- wait until message of quit is sent instead of killing everything
+- implement fmd display for irc message
+- manage registration timeout when the nick is already in use or other uses cases
 - implement prompt
 - implement status bar
 - implemente multiple windows

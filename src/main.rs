@@ -1,10 +1,10 @@
 extern crate termion;
 extern crate chrono;
 
-use termion::{color, style};
 use termion::raw::IntoRawMode;
 use termion::event::Key;
 use termion::input::TermRead;
+use termion::screen::*;
 
 use std::io::{Write, stdout, stdin};
 use std::io::prelude::*;
@@ -15,13 +15,14 @@ use std::sync::{Arc, Mutex};
 use std::sync::mpsc::channel;
 use std::sync::mpsc::{Sender, Receiver};
 
+
 use std::process;
 
-use std::time::SystemTime;
 use chrono::prelude::*;
 
 #[derive(Debug)]
 pub enum IRCMessage {
+    Pass(String),
     Nick(String),
     User(String, String),
     Ping(String),
@@ -30,7 +31,7 @@ pub enum IRCMessage {
     Part(String, String, String),
     Notice(String, String, String),
     PrivMsg(String, String, String),
-    Quit(String, String),
+    Quit(),
     Unknown(String),
     Nothing
 }
@@ -38,6 +39,9 @@ pub enum IRCMessage {
 impl IRCMessage {
     pub fn to_string(self) -> Result<String, String> {
         match self {
+            IRCMessage::Pass(password) => {
+                Ok(format!("PASS {}\r\n", password))
+            },
             IRCMessage::Nick(name) => {
                 Ok(format!("NICK {}\r\n", name))
             },
@@ -62,11 +66,11 @@ impl IRCMessage {
             IRCMessage::Part(_, channel, _) => {
                 Ok(format!("PART {}\r\n", channel))
             }
-            IRCMessage::Quit(_, _) => {
+            IRCMessage::Quit() => {
                 Ok("QUIT\r\n".to_string())
             },
             IRCMessage::Unknown(data) => {
-                Err(data)
+                Err(format!("{}\r\n", data))
             },
             IRCMessage::Nothing => {
                 Err("".to_string())
@@ -90,8 +94,8 @@ impl IRCMessage {
             return IRCMessage::Nothing;
         }
 
-        let mut cmd = cmd.unwrap();
-
+        let cmd = cmd.unwrap();
+        
         match cmd {
             "NOTICE" => {
                 let sender = words.next().unwrap().to_string();
@@ -131,23 +135,30 @@ impl IRCMessage {
 
 fn main() {
 
-    let (receive_write, receive_read): (Sender<String>, Receiver<String>) = channel();
-    let (sender_write, sender_read): (Sender<String>, Receiver<String>) = channel();
-    let (keys_write, keys_read): (Sender<Key>, Receiver<Key>) = channel();
+    let (receive_write, receive_read): (Sender<IRCMessage>, Receiver<IRCMessage>) = channel();
+    let (sender_write, sender_read): (Sender<IRCMessage>, Receiver<IRCMessage>) = channel();
 
-    let sender_write_thread = sender_write.clone();
+    let senderw_receive_thread = sender_write.clone();
+    let senderw_stdin_thread = sender_write.clone();
     
     let mut swriter = TcpStream::connect("irc.mozilla.org:6667").unwrap();
     let mut sreader = swriter.try_clone().unwrap();
 
-    let sender_thread = spawn(move || {
+    let _sender_thread = spawn(move || {
         loop {
             let message = sender_read.recv().expect("Reading from sender_read failed.");
-            swriter.write(message.as_bytes());
+            match message.to_string() {
+                Ok(msg) => {
+                    swriter.write(format!("{}\r\n", msg).as_bytes());
+                },
+                Err(err) => {
+
+                }    
+            }
         }
     });
 
-    let receive_thread = spawn(move || {        
+    let _receive_thread = spawn(move || {        
         loop {
             let mut buffer = [0 as u8; 65535];
             match sreader.read(&mut buffer) {
@@ -162,12 +173,13 @@ fn main() {
                     let broken_lines = lines.split("\n");
                     for message in broken_lines {
                         match IRCMessage::from_string(message) {
+                            IRCMessage::Nothing => {},
                             IRCMessage::Ping(server) => {
-                                let pong_msg = IRCMessage::Pong(server).to_string().unwrap();
-                                sender_write_thread.send(pong_msg);
+                                let pong_msg = IRCMessage::Pong(server);
+                                senderw_receive_thread.send(pong_msg);
                             },
-                            _ => {
-                                receive_write.send(message.to_string()).unwrap();
+                            ircmessage => {
+                                receive_write.send(ircmessage);
                             }
                         }
                     }
@@ -178,11 +190,13 @@ fn main() {
             }
         }
     });
+
+    let mut screen = AlternateScreen::from(stdout().into_raw_mode().unwrap());
     
-    let stdout_main = Arc::new(Mutex::new(stdout().into_raw_mode().unwrap()));;
+    let stdout_main = Arc::new(Mutex::new(screen));;
     let stdout_thread = stdout_main.clone();
 
-    let stdin_thread = spawn(move|| { 
+    let _stdin_thread = spawn(move|| { 
         loop {
             for key in stdin().keys() {
                 if key.is_ok() {
@@ -195,6 +209,7 @@ fn main() {
                             stdout_thread.lock().unwrap().flush().unwrap();
                         },
                         Key::Ctrl('c') => {
+                            senderw_stdin_thread.send(IRCMessage::Quit());
                             process::exit(0);
                         },
                         _ => {
@@ -206,20 +221,31 @@ fn main() {
         }
     });
     
-    sender_write.send(String::from("PASS none\n"));
-    sender_write.send(String::from("NICK ertwiop\n"));
-    sender_write.send(String::from("USER ertwiop blah blah blah\n"));
-    sender_write.send(String::from("JOIN #archlinux\n"));
+    sender_write.send(IRCMessage::Pass("none".to_string()));
+    sender_write.send(IRCMessage::Nick("unbalancedpare".to_string()));
+    sender_write.send(IRCMessage::User("unbalancedparentheses".to_string(), "Federico Carrone".to_string()));
 
     loop {        
-        let msg = receive_read.recv().unwrap();
-        let now: DateTime<Local> = Local::now();
-        
-        write!(stdout_main.lock().unwrap(), "{}:{} {}\r\n", now.hour(), now.minute(), msg);        
-        stdout_main.lock().unwrap().flush().unwrap();
+        match receive_read.recv() {
+            Ok(msg) =>
+                match msg.to_string() {
+                    Ok(s) => {
+                        let now: DateTime<Local> = Local::now();
+                        write!(stdout_main.lock().unwrap(), "{}:{} {}\r\n", now.hour(), now.minute(), s);
+                        stdout_main.lock().unwrap().flush().unwrap();
+                    },
+                    Err(e) => {
+                        write!(stdout_main.lock().unwrap(), "{}", e);
+                    }
+                },
+            Err(RecvError) => {
+                process::exit(1); //TODO this means that the socket was disconnected or the thread died
+            }
+        }
     }
-    
-    sender_thread.join();
-    receive_thread.join();
-    stdin_thread.join();
+
+    //TODO check that threads joined
+    //sender_thread.join();
+    //receive_thread.join();
+    //stdin_thread.join();
 }
