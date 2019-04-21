@@ -1,4 +1,6 @@
 extern crate termion;
+extern crate chrono;
+
 use termion::{color, style};
 use termion::raw::IntoRawMode;
 use termion::event::Key;
@@ -14,6 +16,9 @@ use std::sync::mpsc::channel;
 use std::sync::mpsc::{Sender, Receiver};
 
 use std::process;
+
+use std::time::SystemTime;
+use chrono::prelude::*;
 
 #[derive(Debug)]
 pub enum IRCMessage {
@@ -208,7 +213,9 @@ fn main() {
 
     loop {        
         let msg = receive_read.recv().unwrap();
-        write!(stdout_main.lock().unwrap(), "{}\r\n", msg);        
+        let now: DateTime<Local> = Local::now();
+        
+        write!(stdout_main.lock().unwrap(), "{}:{} {}\r\n", now.hour(), now.minute(), msg);        
         stdout_main.lock().unwrap().flush().unwrap();
     }
     

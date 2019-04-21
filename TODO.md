@@ -1,7 +1,7 @@
 * TODO 
 
-- Refactor channels to ircmessages
 - add TIME 
+- Refactor channels to ircmessages
 - implement prompt
 - implement status bar
 - implemente multiple windows
