@@ -268,7 +268,7 @@ fn main() {
         terminal.draw(|mut f| {
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
-                .constraints([Constraint::Min(1), Constraint::Length(2)].as_ref())
+                .constraints([Constraint::Min(1), Constraint::Length(1)].as_ref())
                 .split(f.size());
 
             let mut messages = app
@@ -286,18 +286,17 @@ fn main() {
                 .wrap(true)
                 .render(&mut f, chunks[0]);
 
+            //TODO I think this should be removed
             Paragraph::new([Text::raw(&app.input)].iter())
                 .style(Style::default().fg(Color::Green))
                 .block(Block::default())
                 .render(&mut f, chunks[1]);
         });
 
-        // Put the cursor back inside the input box
-
-        write!(
+         write!(
             terminal.backend_mut(),
             "{}",
-            Goto(0, max_y - 1)
+            Goto(0, max_y)
         );
         
         match receive_read.recv() {
